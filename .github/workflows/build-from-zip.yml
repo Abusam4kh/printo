@@ -1,0 +1,64 @@
+name: Build PRINTO from ZIP
+
+on:
+  push:
+    paths:
+      - 'printo.zip'
+      - '.github/workflows/build-from-zip.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify archive
+        run: test -f printo.zip
+
+      - name: Extract project archive
+        run: |
+          mkdir -p extracted
+          unzip -o printo.zip -d extracted
+          test -f extracted/project/pubspec.yaml
+          cp -R extracted/project/. .
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.1'
+          channel: stable
+          cache: true
+
+      - name: Generate Android platform files
+        run: flutter create --platforms=android --project-name printo --org com.printo.app .
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: printo-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
